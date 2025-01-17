@@ -32,7 +32,9 @@ class WebSocket {
     Backoff? backoff,
     Duration? timeout,
     String? binaryType,
+    Future<Uri?> Function()? reconnectInfoCall,
   })  : _uri = uri,
+        _reconnectInfoCall = reconnectInfoCall,
         _protocols = protocols,
         _pingInterval = pingInterval,
         _headers = headers,
@@ -42,13 +44,14 @@ class WebSocket {
     _connect();
   }
 
-  final Uri _uri;
+  Uri _uri;
   final Iterable<String>? _protocols;
   final Map<String, dynamic>? _headers;
   final Duration? _pingInterval;
   final Backoff _backoff;
   final Duration _timeout;
   final String? _binaryType;
+  final Future<Uri?> Function()? _reconnectInfoCall;
 
   final _messageController = StreamController<dynamic>.broadcast();
   final _connectionController = ConnectionController();
@@ -125,6 +128,13 @@ class WebSocket {
     if (_isClosedByClient || _isConnected) return;
 
     _connectionController.add(const Reconnecting());
+
+    if (_reconnectInfoCall != null) {
+      final res = await _reconnectInfoCall();
+      if (res != null) {
+        _uri = res;
+      }
+    }
 
     await _connect();
 
