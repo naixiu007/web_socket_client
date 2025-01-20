@@ -32,9 +32,9 @@ class WebSocket {
     Backoff? backoff,
     Duration? timeout,
     String? binaryType,
-    Future<Uri?> Function()? reconnectInfoCall,
+    Future<bool> Function()? needReconnectCall,
   })  : _uri = uri,
-        _reconnectInfoCall = reconnectInfoCall,
+        _needReconnectCall = needReconnectCall,
         _protocols = protocols,
         _pingInterval = pingInterval,
         _headers = headers,
@@ -51,7 +51,7 @@ class WebSocket {
   final Backoff _backoff;
   final Duration _timeout;
   final String? _binaryType;
-  final Future<Uri?> Function()? _reconnectInfoCall;
+  final Future<bool> Function()? _needReconnectCall;
 
   final _messageController = StreamController<dynamic>.broadcast();
   final _connectionController = ConnectionController();
@@ -126,13 +126,14 @@ class WebSocket {
 
   Future<void> _reconnect() async {
     if (_isClosedByClient || _isConnected) return;
-
     _connectionController.add(const Reconnecting());
-
-    if (_reconnectInfoCall != null) {
-      final res = await _reconnectInfoCall();
-      if (res != null) {
-        _uri = res;
+    if (_needReconnectCall != null) {
+      final res = await _needReconnectCall();
+      if (res != true) {
+        _connectionController.add(const Disconnected());
+        _backoff.reset();
+        _backoffTimer?.cancel();
+        return;
       }
     }
 
